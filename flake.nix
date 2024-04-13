@@ -42,15 +42,13 @@
       rec {
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [ deployerEnv tmux git jq ragenix ];
-          shellHook = ''
-            				${pkgs.zsh}/bin/zsh
-            				'';
+          shellHook = ''${pkgs.zsh}/bin/zsh'';
         };
         apps.deployer = pkgs.deployer;
         defaultApp = apps.deployer;
         defaultPackage = pkgs.deployer;
         overlay = overlay;
-        packages = rec {
+        packages = with pkgs; {
           deployer = deployer;
 
 
