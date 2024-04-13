@@ -2,7 +2,7 @@
 name = "deployer"
 version = "0.1.0"
 description = "A tool to manage flake based nix configurations with shared secrets and configs without copying the whole config repo to every machine"
-authors = [""]
+authors = ["Ivan Balashov <ivanbalashov239@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
