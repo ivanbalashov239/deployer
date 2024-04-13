@@ -18,26 +18,25 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, agenix, poetry2nix }:
-    {
-      overlay = final: prev: {
-        deployer = final.poetry2nix.mkPoetryApplication {
-          projectDir = ./.;
-          python = final.python311;
-        };
-        deployerEnv = final.poetry2nix.mkPoetryEnv {
-          editablePackageSources = { deployer = ./.; };
-          projectDir = ./.;
-          python = final.python311;
-        };
-        #deployerTests = final.writeScriptBin "tests" ''
-        #  watchexec -e py "pytest"
-        #'';
-      };
-    } // (flake-utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachDefaultSystem (system:
       let
+        overlay = final: prev: {
+          deployer = final.poetry2nix.mkPoetryApplication {
+            projectDir = ./.;
+            python = final.python311;
+          };
+          deployerEnv = final.poetry2nix.mkPoetryEnv {
+            editablePackageSources = { deployer = ./.; };
+            projectDir = ./.;
+            python = final.python311;
+          };
+          #deployerTests = final.writeScriptBin "tests" ''
+          #  watchexec -e py "pytest"
+          #'';
+        };
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ self.overlay agenix.overlays.default ];
+          overlays = [ overlay agenix.overlays.default ];
         };
       in
       rec {
@@ -50,5 +49,11 @@
         apps.deployer = pkgs.deployer;
         defaultApp = apps.deployer;
         defaultPackage = pkgs.deployer;
-      }));
+        overlay = overlay;
+        packages = rec {
+          deployer = deployer;
+
+
+        };
+      });
 }
