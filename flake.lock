@@ -171,7 +171,7 @@
     "nix-github-actions": {
       "inputs": {
         "nixpkgs": [
-          "poetry2nix",
+          "poetry2nixrepo",
           "nixpkgs"
         ]
       },
@@ -191,21 +191,21 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1704290814,
-        "narHash": "sha256-LWvKHp7kGxk/GEtlrGYV68qIvPHkU9iToomNFGagixU=",
+        "lastModified": 1712867921,
+        "narHash": "sha256-edTFV4KldkCMdViC/rmpJa7oLIU8SE/S35lh/ukC7bg=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "70bdadeb94ffc8806c0570eb5c2695ad29f0e421",
+        "rev": "51651a540816273b67bc4dedea2d37d116c5f7fe",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
-        "ref": "nixos-23.05",
+        "ref": "nixos-23.11",
         "repo": "nixpkgs",
         "type": "github"
       }
     },
-    "poetry2nix": {
+    "poetry2nixrepo": {
       "inputs": {
         "flake-utils": "flake-utils_3",
         "nix-github-actions": "nix-github-actions",
@@ -234,7 +234,7 @@
         "agenix": "agenix",
         "flake-utils": "flake-utils_2",
         "nixpkgs": "nixpkgs",
-        "poetry2nix": "poetry2nix"
+        "poetry2nixrepo": "poetry2nixrepo"
       }
     },
     "rust-overlay": {
@@ -339,7 +339,7 @@
     "treefmt-nix": {
       "inputs": {
         "nixpkgs": [
-          "poetry2nix",
+          "poetry2nixrepo",
           "nixpkgs"
         ]
       },

@@ -7,51 +7,55 @@
   nixConfig.extra-system-features = "recursive-nix";
 
   inputs = {
-    nixpkgs.url = github:nixos/nixpkgs/nixos-23.05;
+    nixpkgs.url = github:nixos/nixpkgs/nixos-23.11;
     flake-utils.url = github:numtide/flake-utils;
     agenix.url = "github:yaxitech/ragenix";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
-    poetry2nix = {
+    poetry2nixrepo = {
       url = github:nix-community/poetry2nix;
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, agenix, poetry2nix }:
+  outputs = { self, nixpkgs, flake-utils, agenix, poetry2nixrepo }:
     flake-utils.lib.eachDefaultSystem (system:
       let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ agenix.overlays.default ];
+        };
+        dependencies = with pkgs; [ tmux git jq ragenix ];
+        poetry2nix = import poetry2nixrepo { inherit pkgs; };
+        deployer = poetry2nix.mkPoetryApplication {
+          projectDir = ./.;
+          python = pkgs.python311;
+          nativeBuildInputs = dependencies;
+        };
+        #deployerEnv = poetry2nix.mkPoetryEnv {
+        #editablePackageSources = { deployer = ./.; };
+        #projectDir = ./.;
+        #python = pkgs.python311;
+        #nativeBuildInputs = dependencies;
+        #};
         overlay = final: prev: {
-          deployer = final.poetry2nix.mkPoetryApplication {
-            projectDir = ./.;
-            python = final.python311;
-          };
-          deployerEnv = final.poetry2nix.mkPoetryEnv {
-            editablePackageSources = { deployer = ./.; };
-            projectDir = ./.;
-            python = final.python311;
-          };
+          deployer = deployer;
+          #deployerEnv = deployerEnv;
           #deployerTests = final.writeScriptBin "tests" ''
           #  watchexec -e py "pytest"
           #'';
         };
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ overlay agenix.overlays.default ];
-        };
       in
       rec {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ deployerEnv tmux git jq ragenix ];
+          buildInputs = dependencies;
           shellHook = ''${pkgs.zsh}/bin/zsh'';
         };
-        apps.deployer = pkgs.deployer;
+        apps.deployer = deployer;
         defaultApp = apps.deployer;
-        defaultPackage = pkgs.deployer;
+        defaultPackage = deployer;
         overlay = overlay;
-        packages = with pkgs; {
+        packages = {
           deployer = deployer;
-
-
         };
       });
 }
