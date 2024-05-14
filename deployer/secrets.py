@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from subprocess import Popen
+from subprocess import Popen, PIPE
 
 import click
 
@@ -70,24 +70,20 @@ class SecretsNix:
     def save(self, force=False):
         with open(self.path, "w") as f:
             f.write(str(self))
-        forceflag = ""
-        if force:
-            forceflag = "-f"
-        # rootpath = self.path.parent.parent
-        # originalpath = Path(rootpath, ".secrets")
-        # secretspath = Path(rootpath, "secrets")
-        # for name, hosts in self.files.items():
-        #     if type(hosts) == list:
-        #         for host in hosts:
-        #             if host not in self.machines:
-        #                 raise Exception(f"{host} has no key")
-                    # cmd = f"cp -l {secret} {Path(secretspath, name)}"
-                    # sh = Popen(cmd, cwd=rootpath, shell=True)
-                    # sh.wait()
-        resecret = f"./secrets.sh {forceflag} ../.secrets/"
-        click.echo(resecret)
-        sh = Popen(resecret, cwd=str(Path(self.path).parent), shell=True)
-        sh.wait()
+        rootpath = self.path.parent.parent
+        secretsoriginroot = Path(rootpath, ".secrets")
+        secretsroot = Path(rootpath, "secrets")
+        for name, hosts in self.files.items():
+            if not all(host in self.machines for host in hosts):
+                raise Exception(f"{name} one of hosts keys is missing {hosts}")
+            secretorigin = Path(secretsoriginroot, name)
+            secretpath = Path(secretsroot, name)
+            if not secretpath.exists() or force:
+                cmd = f"ragenix --editor - --edit {secretpath}"
+                with open(secretorigin.with_suffix("")) as file:
+                    sh = Popen(cmd, cwd=secretsroot, shell=True, stdin=file, stdout=PIPE)
+                    sh.wait()
+                    click.echo(f"Secret {name} created")
 
     def add(self, path, host, hostkey=None):
         path = path.relative_to(self.path.parent)
