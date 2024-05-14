@@ -9,7 +9,8 @@ python = "^3.9"
 click = "*"
 
 [tool.poetry.dev-dependencies]
-#pytest = "^6.2.5"
+pytest = "^6.2.5"
+pytest-xdist = "*"
 #ipython = "^7.27.0"
 
 [build-system]

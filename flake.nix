@@ -24,19 +24,18 @@
           inherit system;
           overlays = [ agenix.overlays.default ];
         };
-        dependencies = with pkgs; [ tmux git jq ragenix ];
         poetry2nix = import poetry2nixrepo { inherit pkgs; };
+        dependencies = with pkgs; [ tmux git jq ragenix ];
         deployer = poetry2nix.mkPoetryApplication {
           projectDir = ./.;
           python = pkgs.python311;
           nativeBuildInputs = dependencies;
         };
-        #deployerEnv = poetry2nix.mkPoetryEnv {
-        #editablePackageSources = { deployer = ./.; };
-        #projectDir = ./.;
-        #python = pkgs.python311;
-        #nativeBuildInputs = dependencies;
-        #};
+        deployerEnv = poetry2nix.mkPoetryEnv {
+          editablePackageSources = { deployer = ./.; };
+          projectDir = ./.;
+          python = pkgs.python311;
+        };
         overlay = final: prev: {
           deployer = deployer;
           #deployerEnv = deployerEnv;
@@ -47,7 +46,7 @@
       in
       rec {
         devShell = pkgs.mkShell {
-          buildInputs = dependencies;
+          buildInputs = dependencies ++ [ pkgs.qemu_kvm deployerEnv pkgs.poetry ];
           shellHook = ''${pkgs.zsh}/bin/zsh'';
         };
         apps.deployer = deployer;
