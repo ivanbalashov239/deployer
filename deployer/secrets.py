@@ -80,6 +80,7 @@ class SecretsNix:
             secretpath = Path(secretsroot, name)
             if not secretpath.exists() or force:
                 cmd = f"ragenix --editor - --edit {secretpath}"
+                secretpath.parent.mkdir(parents=True, exist_ok=True)
                 with open(secretorigin.with_suffix("")) as file:
                     sh = Popen(cmd, cwd=secretsroot, shell=True, stdin=file, stdout=PIPE)
                     sh.wait()
@@ -87,6 +88,8 @@ class SecretsNix:
 
     def add(self, path, host, hostkey=None):
         path = path.relative_to(self.path.parent)
+        if not str(path).endswith(".age"):
+            path = Path(str(path) + ".age")
         if not self.machines.get(host) and not hostkey:
             raise Exception(
                 f" {host} has no key, for new hosts hostkey has to be specified"

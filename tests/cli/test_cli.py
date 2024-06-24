@@ -1,7 +1,5 @@
 import time
 from pathlib import Path
-from subprocess import Popen, PIPE
-import re
 
 from click.testing import CliRunner
 
@@ -257,11 +255,12 @@ rm -rf {test_repo}/hosts/testhost/.git
 """],
     ], ids=ids)
     def test_rebuild(self, test_repo, test_path, test_vm, test_sshkey, command, monkeypatch, output_start, output_end):
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         monkeypatch.chdir(test_repo)
         sshargs = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_sshkey}"
         env = {"SSH_ARGS": sshargs}
-        result = runner.invoke(cli, ["rebuild", command, "testhost", "root@localhost"], env=env)
+        result = runner.invoke(cli, ["rebuild", command, "testhost", "root@localhost"], env=env, )
+        print(result.stdout)
         assert result.exit_code == 0, result.stderr
         output_start = output_start.format(test_repo=test_repo, test_path=test_path)
         output_end = output_end.format(test_repo=test_repo, test_path=test_path)

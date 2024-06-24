@@ -8,6 +8,32 @@ import re
 from deployer.gitrepo import GitRepo
 from deployer.secrets import SecretsNix
 
+def mksshkey(path, keytype):
+    keypath = Path(path, f"ssh_host_{keytype}_key").resolve()
+    if not keypath.exists():
+        sshkeygen = f"ssh-keygen -t {keytype} -f {keypath} -N ''"
+        click.echo(sshkeygen)
+        sh = Popen(sshkeygen, cwd=str(path), shell=True, stdin=PIPE)
+        sh.wait()
+    return keypath
+
+def mktailscalekey(path, name, boot=False):
+    keypath = Path(path, "tailscale.authkey").resolve()
+    if boot:
+        keypath = Path(path, "boot", "tailscale.authkey").resolve()
+    tailscale_url = "https://login.tailscale.com/admin/settings/keys"
+    click.echo(f"Please visit the following URL to create a new Tailscale auth key:\n{tailscale_url}\n")
+    click.echo(f"set it to reusable")
+    if boot:
+        click.echo(f"tag it as boot key\nAnd make it ephemeral")
+    else:
+        click.echo(f"tag it with appropriate tags")
+    new_key = click.prompt("Enter the new Tailscale auth key")
+    with open(keypath, "w") as key_file:
+        key_file.write(new_key)
+    click.echo(f"Auth key for tailscale {name}, saved to {keypath}")
+    return keypath
+
 
 def get_hosts(host):
     if host:
@@ -236,6 +262,45 @@ def secrets(ctx, path, force):
 def show(ctx, name):
     click.echo(f"flake show {name}")
     click.echo("show subcommand")
+
+
+@cli.command()
+@click.argument("name", required=True)
+@click.pass_context
+def newhost(ctx, name):
+    path = Path(f"./hosts/{name}")
+    if path.exists():
+        click.echo(f"{path} already exists")
+        return 1
+    path.mkdir()
+    click.echo(f"created {path}")
+    dotsecrets = Path(".secrets", "hosts", name)
+    secrets = SecretsNix(Path("secrets", "secrets.nix").resolve())
+    if dotsecrets.exists():
+        click.echo(f"{dotsecrets} already exists")
+    else:
+        Path(dotsecrets, "boot").mkdir(parents=True)
+        click.echo(f"created {dotsecrets}")
+        rsakey = mksshkey(Path(dotsecrets), "rsa")
+        edkey = mksshkey(Path(dotsecrets), "ed25519")
+        rsabootkey = mksshkey(Path(dotsecrets, "boot"), "rsa")
+        edbootkey = mksshkey(Path(dotsecrets, "boot"), "ed25519")
+        pubkey=Path(str(edkey)+ ".pub").read_text()
+        tailkey = mktailscalekey(dotsecrets, name)
+        boottailkey = mktailscalekey(dotsecrets, name, boot=True)
+        for f in [rsabootkey, edbootkey, tailkey, boottailkey]:
+            print("adding secret")
+            print(f)
+            print(dotsecrets.resolve())
+            relative = f.relative_to(Path(".secrets").resolve())
+            print(relative)
+            path = Path(Path("secrets").resolve(), relative)
+            print(path)
+            secrets.add(path, name, pubkey)
+        secrets.save()
+
+
+
 
 
 if __name__ == "__main__":

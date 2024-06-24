@@ -42,6 +42,7 @@ git init; git add *; git add .*
             "secrets",
             "configuration.nix",
             "flake.nix",
+            "flake.lock",
             "hardware-configuration.nix"
         }
         verify_files(test_repo, ["configs", "modules", "secrets"], ["hosts/testhost/configs", "hosts/testhost/modules", "hosts/testhost/secrets"])

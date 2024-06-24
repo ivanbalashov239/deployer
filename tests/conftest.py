@@ -5,7 +5,7 @@ from pathlib import Path
 from subprocess import Popen, PIPE, run
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_repo():
     with tempfile.TemporaryDirectory() as tmp:
         for file in Path(Path(__file__).parent, "test_repo").iterdir():
@@ -13,7 +13,7 @@ def test_repo():
         yield tmp
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_path():
     with (tempfile.TemporaryDirectory() as tmp):
         for file in Path(Path(__file__).parent, "test_host").iterdir():
@@ -25,7 +25,7 @@ def test_path():
         sh.wait()
         yield tmp
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_vm(test_path):
     buildvm = Popen("nixos-rebuild build-vm --flake ./etc/nixos/#test", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     buildvm.wait()
@@ -36,7 +36,7 @@ def test_vm(test_path):
 
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_sshkey(test_path):
     return Path(test_path, "etc", "ssh", "ssh_host_ed25519_key")
 
