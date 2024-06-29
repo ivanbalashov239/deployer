@@ -1,3 +1,5 @@
+import time
+
 import pytest
 import tempfile
 import shutil
@@ -26,11 +28,18 @@ def test_path():
         yield tmp
 
 @pytest.fixture(scope="function")
-def test_vm(test_path):
+def test_vm(test_path, test_sshkey):
     buildvm = Popen("nixos-rebuild build-vm --flake ./etc/nixos/#test", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     buildvm.wait()
+    ssh_args = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_sshkey}"
+    ssh_args_e = f"-e 'ssh {ssh_args}'"
     env = {"QEMU_NET_OPTS": "hostfwd=tcp::2221-:22"}
     vm = Popen("result/bin/run-nixos-vm --nographic", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
+    time.sleep(5)
+    rsynccmd = Popen(f"rsync {ssh_args_e} -rvha ./etc/nixos/ root@localhost:/etc/nixos/", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    rsynccmd.wait()
+    if rsynccmd.returncode != 0:
+        raise Exception(f"rsync failed {rsynccmd.stderr.read()}")
     yield vm
     vm.kill()
 

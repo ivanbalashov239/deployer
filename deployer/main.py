@@ -1,4 +1,6 @@
 # from deployer.deployer.something import message
+import shutil
+
 import click
 import socket
 from pathlib import Path
@@ -8,6 +10,7 @@ import re
 from deployer.gitrepo import GitRepo
 from deployer.secrets import SecretsNix
 
+
 def mksshkey(path, keytype):
     keypath = Path(path, f"ssh_host_{keytype}_key").resolve()
     if not keypath.exists():
@@ -16,6 +19,7 @@ def mksshkey(path, keytype):
         sh = Popen(sshkeygen, cwd=str(path), shell=True, stdin=PIPE)
         sh.wait()
     return keypath
+
 
 def mktailscalekey(path, name, boot=False):
     keypath = Path(path, "tailscale.authkey").resolve()
@@ -35,23 +39,62 @@ def mktailscalekey(path, name, boot=False):
     return keypath
 
 
-def get_hosts(host):
-    if host:
-        names = host.split(",")
+def fill_new_host(name):
+    path = Path(f"./hosts/{name}")
+    if path.exists():
+        click.echo(f"{path} already exists")
+        return 1
+    path.mkdir()
+    click.echo(f"created {path}")
+    dotsecrets = Path(".secrets", "hosts", name)
+    secrets = SecretsNix(Path("secrets", "secrets.nix").resolve())
+    if dotsecrets.exists():
+        click.echo(f"{dotsecrets} already exists")
     else:
-        names = []
-    paths = []
-    if not names or len(names) == 0:
-        paths = list(Path("./hosts").glob("*"))
-    else:
-        for n in names:
-            path = Path(f"./hosts/{n}")
-            if path.exists():
-                paths.append(path)
-            else:
-                click.echo(f"{n} config doesn't exist")
-                return None
-    return paths
+        Path(dotsecrets, "boot").mkdir(parents=True)
+        click.echo(f"created {dotsecrets}")
+        rsakey = mksshkey(Path(dotsecrets), "rsa")
+        edkey = mksshkey(Path(dotsecrets), "ed25519")
+        rsabootkey = mksshkey(Path(dotsecrets, "boot"), "rsa")
+        edbootkey = mksshkey(Path(dotsecrets, "boot"), "ed25519")
+        pubkey = Path(str(edkey) + ".pub").read_text()
+        tailkey = mktailscalekey(dotsecrets, name)
+        boottailkey = mktailscalekey(dotsecrets, name, boot=True)
+        for f in [rsabootkey, edbootkey, tailkey, boottailkey]:
+            relative = f.relative_to(Path(".secrets").resolve())
+            secretpath = Path(Path("secrets").resolve(), relative)
+            secrets.add(secretpath, name, pubkey)
+        secrets.save()
+    # copy files from {root of main.py}/default_nix/ to hosts/name/
+    default_nix = Path(Path(__file__).parent, "default_nix")
+    for f in ["configuration.nix", "flake.nix"]:
+        originalpath = Path(default_nix, f)
+        newpath = Path(path, f).resolve()
+        shutil.copy(originalpath, newpath)
+        click.echo(f"created {newpath}")
+        renamecmd = Popen(f"sed -i 's/NEWHOSTNAME/{name}/g' {newpath}", shell=True, stdin=PIPE)
+        renamecmd.wait()
+        if renamecmd.returncode != 0:
+            click.echo(f"sed failed {newpath}")
+            return 1
+        click.echo(f"renamed NEWHOSTNAME to {name} in {newpath}")
+
+
+def get_or_create_host(ctx, host):
+    """
+    :param ctx: click context
+    :param host: name of the host
+    verify that host exists and if not run newhost for it
+    return Path to the host directory
+    """
+    path = Path(f"./hosts/{host}")
+    if not path.exists():
+        click.echo(f"{path} doesn't exist")
+        if click.confirm(f"Do you want to create {path}/[configuration.nix,flake.nix]"):
+            fill_new_host(host)
+            return path, True
+        return None, False
+    return path, False
 
 
 def dry_build(path, gitrepo, target, show_trace):
@@ -116,7 +159,6 @@ def create_git(path):
 @click.group()
 @click.pass_context
 def cli(ctx):
-    # TODO when referencing missing secrets check if they exist and if not encrypt them with host ssh key with rage-nix probably it should change configuration of secrets.nix so might be not trivial
     ctx.obj = {}
     pass
 
@@ -139,55 +181,86 @@ def rebuild(ctx, command, host, target, args, show_trace, ssh_args):
         target = f"root@{host}"
     if target == "localhost":
         target = None
+    ssh_args_e = ""
+    if ssh_args:
+        ssh_args_e = f"-e 'ssh {ssh_args}'"
 
-    paths = get_hosts(host)
-    if not paths:
-        return 1
-    for path in paths:
-        path = Path(path)
-        secrets = SecretsNix(Path(path.parent.parent, "secrets/secrets.nix"))
-        ctx.obj["secrets"] = ctx.with_resource(secrets)
-        gitrepo = GitRepo(path, secrets=secrets)
-        ctx.obj["gitrepo"] = ctx.with_resource(gitrepo)
-        if not dry_build(path, gitrepo, target, show_trace):
-            click.echo("dry-build failed")
-            ctx.exit(1)
-        if command == "dry-build":
-            return
-        click.echo(f"cd {path}")
-        if target:
+    path, created = get_or_create_host(ctx, host)
+    if not path:
+        ctx.exit(1)
+    if created or command == "init":
+        if target and click.confirm("upload keys to the host and download hardware-configuration.nix"):
             if target.startswith("/"):
-                rsynccmd = f"sudo rsync -rvh --chown=root:root ./ {target}"
-                click.echo(rsynccmd)
-                sh = Popen(rsynccmd, cwd=str(path), shell=True, stdin=PIPE)
-                sh.wait()
-                return
+                click.echo("target should be remoet to init")
+                ctx.exit(1)
             else:
-                ssh_e = ""
-                if ssh_args:
-                    ssh_e = f"-e 'ssh {ssh_args}'"
-                rsynccmd = f"rsync {ssh_e} -rvh --chown=root:root ./ {target}:/etc/nixos"
+                click.echo("uploading keys")
+                rsynccmd = f"rsync {ssh_args_e} -rvh --chown=root:root ../../.secrets/hosts/{host}/" + "{ssh_host_rsa_key,ssh_host_rsa_key.pub,ssh_host_ed25519_key,ssh_host_ed25519_key.pub}" + f" {target}:/etc/ssh/"
                 click.echo(rsynccmd)
                 sh = Popen(rsynccmd, cwd=str(path), shell=True, stdin=PIPE)
                 sh.wait()
-                # nixoscmd += f" --fast --max-jobs 0 --no-build-nix --build-host '{target}' --target-host {target}"
-                nixoscmd = f"ssh {ssh_args or ''} {target} nixos-rebuild {command} --flake /etc/nixos/#{path.name}"
+                if sh.returncode != 0:
+                    click.echo("keys could not be uploaded")
+                    ctx.exit(1)
+                rsynccmd = f"rsync {ssh_args_e} -rvh {target}:/etc/nixos/hardware-configuration.nix {path.resolve()}/hardware-configuration.nix"
+                click.echo(rsynccmd)
+                sh = Popen(rsynccmd, cwd=str(path), shell=True, stdin=PIPE)
+                sh.wait()
+                if sh.returncode != 0:
+                    click.echo("hardware-configuration.nix not found")
+                    ctx.exit(1)
+                sshcmd = f"ssh {ssh_args or ''} {target} mv /etc/nixos /etc/nixos.original"
+                click.echo(sshcmd)
+                sh = Popen(sshcmd, cwd=str(path), shell=True, stdin=PIPE)
+                sh.wait()
+                if sh.returncode != 0:
+                    click.echo("couldnt save original nixos configuration")
+                    ctx.exit(1)
+                command = "boot"
         else:
-            if command in ["test", "switch"]:
-                rsynccmd = f"sudo rsync -rvh --chown=root:root ./ /etc/nixos"
-                click.echo(rsynccmd)
-                sh = Popen(rsynccmd, cwd=str(path), shell=True, stdin=PIPE)
-                sh.wait()
-                nixoscmd = f"sudo nixos-rebuild {command} --flake /etc/nixos/#{path.name}"
-            else:
-                nixoscmd = f"nixos-rebuild {command} --flake ./#{path.name}"
-        if show_trace:
-            nixoscmd += f" --show-trace"
-        nixoscmd += " ".join(args)
-        click.echo(nixoscmd)
-        sh = Popen(nixoscmd, cwd=str(path), shell=True, stdin=PIPE)
-        sh.wait()
-        ctx.exit(sh.returncode)
+            click.echo("target is required for init")
+            ctx.exit(1)
+
+    secrets = SecretsNix(Path(path.parent.parent, "secrets/secrets.nix"))
+    ctx.obj["secrets"] = ctx.with_resource(secrets)
+    gitrepo = GitRepo(path, secrets=secrets)
+    ctx.obj["gitrepo"] = ctx.with_resource(gitrepo)
+    if not dry_build(path, gitrepo, target, show_trace):
+        click.echo("dry-build failed")
+        ctx.exit(1)
+    if command == "dry-build":
+        return
+    click.echo(f"cd {path}")
+    if target:
+        if target.startswith("/"):
+            rsynccmd = f"sudo rsync -rvh --chown=root:root ./ {target}"
+            click.echo(rsynccmd)
+            sh = Popen(rsynccmd, cwd=str(path), shell=True, stdin=PIPE)
+            sh.wait()
+            return
+        else:
+            rsynccmd = f"rsync {ssh_args_e} -rvh --chown=root:root ./ {target}:/etc/nixos"
+            click.echo(rsynccmd)
+            sh = Popen(rsynccmd, cwd=str(path), shell=True, stdin=PIPE)
+            sh.wait()
+            # nixoscmd += f" --fast --max-jobs 0 --no-build-nix --build-host '{target}' --target-host {target}"
+            nixoscmd = f"ssh {ssh_args or ''} {target} nixos-rebuild {command} --flake /etc/nixos/#{path.name}"
+    else:
+        if command in ["test", "switch"]:
+            rsynccmd = f"sudo rsync -rvh --chown=root:root ./ /etc/nixos"
+            click.echo(rsynccmd)
+            sh = Popen(rsynccmd, cwd=str(path), shell=True, stdin=PIPE)
+            sh.wait()
+            nixoscmd = f"sudo nixos-rebuild {command} --flake /etc/nixos/#{path.name}"
+        else:
+            nixoscmd = f"nixos-rebuild {command} --flake ./#{path.name}"
+    if show_trace:
+        nixoscmd += f" --show-trace"
+    nixoscmd += " ".join(args)
+    click.echo(nixoscmd)
+    sh = Popen(nixoscmd, cwd=str(path), shell=True, stdin=PIPE)
+    sh.wait()
+    ctx.exit(sh.returncode)
 
 
 # @cli.result_callback()
@@ -221,30 +294,37 @@ def flake(ctx):
         # click.echo(f"I am about to invoke {ctx.invoked_subcommand}")
 
 
-@flake.command()
-@click.argument("host", required=False)
-@click.option("--inputname", "-i", required=False)
+@cli.command()
+@click.argument("host", required=True)
+@click.option("--inputname", "-i", required=False, multiple=True)
 @click.argument("args", required=False, nargs=-1)
 @click.pass_context
 def update(ctx, host, inputname, args):
-    paths = get_hosts(host)
-    for path in paths:
-        path = Path(path)
-        secrets = SecretsNix(Path(path.parent.parent, "secrets/secrets.nix"))
-        ctx.obj["secrets"] = ctx.with_resource(secrets)
-        gitrepo = GitRepo(path, secrets=secrets)
-        ctx.obj["gitrepo"] = ctx.with_resource(gitrepo)
-        cmd = f"nix flake update"
-        cmd += " " + " ".join(args)
-        flakepath = Path(path, "flake.nix")
-        if flakepath.exists():
-            click.echo(f"cd {path}")
+    path, created = get_or_create_host(ctx, host)
+    secrets = SecretsNix(Path(path.parent.parent, "secrets/secrets.nix"))
+    ctx.obj["secrets"] = ctx.with_resource(secrets)
+    gitrepo = GitRepo(path, secrets=secrets)
+    ctx.obj["gitrepo"] = ctx.with_resource(gitrepo)
+    cmd = f"nix flake lock"
+    cmd += " " + " ".join(args)
+    flakepath = Path(path, "flake.nix")
+    if flakepath.exists():
+        click.echo(f"cd {path}")
+        if len(inputname) > 0:
+            for i in inputname:
+                cmd += f" --update-input {i}"
             click.echo(cmd)
-            sh = Popen(cmd, cwd=str(path), shell=True, stdin=PIPE)
-            sh.wait()
         else:
-            click.echo(f"{flakepath} doesn't exist")
-            return 1
+            cmd = f"nix flake update"
+        sh = Popen(cmd, cwd=str(path), shell=True, stdin=PIPE, stderr=PIPE)
+        sh.wait()
+        if sh.returncode != 0:
+            click.echo(sh.stderr.read(), err=True)
+            click.echo("", err=False)
+            ctx.exit(1)
+    else:
+        click.echo(f"{flakepath} doesn't exist")
+        return 1
 
 
 @cli.command()
@@ -268,39 +348,7 @@ def show(ctx, name):
 @click.argument("name", required=True)
 @click.pass_context
 def newhost(ctx, name):
-    path = Path(f"./hosts/{name}")
-    if path.exists():
-        click.echo(f"{path} already exists")
-        return 1
-    path.mkdir()
-    click.echo(f"created {path}")
-    dotsecrets = Path(".secrets", "hosts", name)
-    secrets = SecretsNix(Path("secrets", "secrets.nix").resolve())
-    if dotsecrets.exists():
-        click.echo(f"{dotsecrets} already exists")
-    else:
-        Path(dotsecrets, "boot").mkdir(parents=True)
-        click.echo(f"created {dotsecrets}")
-        rsakey = mksshkey(Path(dotsecrets), "rsa")
-        edkey = mksshkey(Path(dotsecrets), "ed25519")
-        rsabootkey = mksshkey(Path(dotsecrets, "boot"), "rsa")
-        edbootkey = mksshkey(Path(dotsecrets, "boot"), "ed25519")
-        pubkey=Path(str(edkey)+ ".pub").read_text()
-        tailkey = mktailscalekey(dotsecrets, name)
-        boottailkey = mktailscalekey(dotsecrets, name, boot=True)
-        for f in [rsabootkey, edbootkey, tailkey, boottailkey]:
-            print("adding secret")
-            print(f)
-            print(dotsecrets.resolve())
-            relative = f.relative_to(Path(".secrets").resolve())
-            print(relative)
-            path = Path(Path("secrets").resolve(), relative)
-            print(path)
-            secrets.add(path, name, pubkey)
-        secrets.save()
-
-
-
+    fill_new_host(name)
 
 
 if __name__ == "__main__":

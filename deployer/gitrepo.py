@@ -218,10 +218,10 @@ class GitRepo:
 
     def rmrf(self, path):
         cmd = f"rm -rf {path.resolve()}"
-        click.echo("")
-        click.echo(f"-- removing {path} --")
-        click.echo("")
-        click.echo(cmd)
+        click.echo("", err=False)
+        click.echo(f"-- removing {path} --", err=False)
+        click.echo("", err=False)
+        click.echo(cmd, err=False)
         sh = Popen(
             cmd,
             cwd=str(self.path),
