@@ -19,6 +19,6 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - uses: rrbutani/use-nix-shell-action@v1
         with:
-          devShell: .#devShell --accept-flake-config
+          extraNixOptions: --accept-flake-config
       - name: run tests in parallel
         run: pytest -n 20
