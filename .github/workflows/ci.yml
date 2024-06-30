@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: ${{ fromJson(needs.build.env.TESTS ) }}
+        test: ${{ fromJson(env.TESTS ) }}
 
     needs: build
 
