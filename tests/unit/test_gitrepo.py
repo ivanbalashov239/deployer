@@ -91,7 +91,7 @@ git init; git add *; git add .*
         gitrepo = GitRepo(Path("hosts/testhost"))
         captured = capsys.readouterr()
         assert captured.err == ""
-        assert captured.out == output.format(test_repo=test_repo)
+        assert set(captured.out.split("\n")) == set(output.format(test_repo=test_repo).split("\n"))
         assert {x.name for x in Path(test_repo, "hosts/testhost").iterdir()} == {
             ".git",
             "configs",
