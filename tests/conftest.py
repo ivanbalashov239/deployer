@@ -44,6 +44,8 @@ def test_vm(test_path, test_sshkey, available_port):
     buildvm = Popen("nixos-rebuild build-vm --flake ./etc/nixos/#test", cwd=Path(test_path), shell=True, stdin=PIPE,
                     stdout=PIPE, stderr=PIPE)
     buildvm.wait()
+    if buildvm.returncode != 0:
+        raise Exception(f"failed to build vm {buildvm.stderr.read()}")
     ssh_args = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_sshkey}"
     ssh_args_e = f"-e 'ssh {ssh_args}'"
     env = {"QEMU_NET_OPTS": f"hostfwd=tcp::{available_port}-:22"}
