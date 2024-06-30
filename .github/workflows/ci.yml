@@ -26,11 +26,8 @@ jobs:
 
       - name: Collect tests
         id: collect-tests
-        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split(\"\n\") | map(select(length > 0))')" >> $GITHUB_ENV
+        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split(\"\n\") | map(select(length > 0))'" >> $GITHUB_ENV
 
-      - name: Set matrix dynamically
-        run: echo "::set-output name=test-matrix::$(jq -c 'split("\n") | map(select(length > 0))' <<< "${{ env.TESTS }}")"
-        id: set-matrix
 
   parallel_tests:
     runs-on: ubuntu-latest
@@ -38,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: ${{ fromJson(needs.build.outputs['set-matrix']) }}
+        test: ${{ fromJson(needs.build.env.TESTS ) }}
 
     needs: build
 
@@ -47,4 +44,4 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Run tests
-        run: pytest -n 20 ${{ matrix.test }}
+        run: pytest -n 20 ${{ matrix.test }} -vv
