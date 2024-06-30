@@ -47,7 +47,7 @@
       rec {
         devShell = pkgs.mkShell {
           buildInputs = dependencies ++ [ pkgs.qemu_kvm deployerEnv pkgs.poetry ];
-          shellHook = ''${pkgs.zsh}/bin/zsh'';
+#          shellHook = ''${pkgs.zsh}/bin/zsh'';
         };
         apps.deployer = deployer;
         defaultApp = apps.deployer;
