@@ -50,6 +50,8 @@ def test_vm(test_path, test_sshkey, available_port):
     vm = Popen("result/bin/run-nixos-vm --nographic", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE,
                stderr=PIPE, env=env)
     time.sleep(5)
+    if vm.returncode is not None:
+        raise Exception(f"vm failed to start {vm.stderr.read()}")
     rsynccmd = Popen(f"rsync {ssh_args_e} -rvha ./etc/nixos/ root@localhost:/etc/nixos/", cwd=Path(test_path),
                      shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     rsynccmd.wait()
