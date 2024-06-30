@@ -33,7 +33,7 @@ jobs:
         run: echo 'tests=["tests/cli/test_cli.py::TestCli::test_rebuild[dry-build-outputs0]","tests/cli/test_cli.py::TestCli::test_rebuild[build-outputs1]","tests/cli/test_cli.py::TestCli::test_rebuild[test-outputs2]","tests/cli/test_cli.py::TestCli::test_rebuild[switch-outputs3]","tests/cli/test_cli.py::TestCli::test_newhost","tests/cli/test_cli.py::TestCli::test_init_newhost","tests/cli/test_cli.py::TestCli::test_update[inputs=[]]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs']]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs', 'nixos']]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs', 'agenix']]","tests/unit/test_gitrepo.py::TestGitRepo::test_add[]","tests/unit/test_secrets.py::TestSecrets::test_in_repo[]","tests/unit/test_secrets.py::TestSecrets::test_init","tests/unit/test_secrets.py::TestSecrets::test__add","14 tests collected in 0.02s"]' >> $GITHUB_OUTPUT
 
     outputs:
-      tests: ${{ steps.collect-tests.outputs.test }}
+      tests: ${{ steps.collect-tests.outputs.tests }}
 
   parallel_tests:
     runs-on: ubuntu-latest
