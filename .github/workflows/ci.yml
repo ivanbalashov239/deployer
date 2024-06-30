@@ -23,6 +23,6 @@ jobs:
         run: ls -laR
       - uses: rrbutani/use-nix-shell-action@v1
         with:
-          devShell: .#default # this is the default
+          devShell: .#default --accept-flake-config
       - name: run tests in parallel
         run: pytest -n 20
