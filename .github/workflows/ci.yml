@@ -19,14 +19,22 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
-      - name: Use Nix Shell
-        uses: rrbutani/use-nix-shell-action@v1
-        with:
-          extraNixOptions: --accept-flake-config
+      #      - name: Use Nix Shell
+      #        uses: rrbutani/use-nix-shell-action@v1
+      #        with:
+      #          extraNixOptions: --accept-flake-config
+      #
+      #      - name: Collect tests
+      #        id: collect-tests
+      #        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
 
       - name: Collect tests
         id: collect-tests
-        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
+        run: echo 'TESTS=["tests/cli/test_cli.py::TestCli::test_rebuild[dry-build-outputs0]","tests/cli/test_cli.py::TestCli::test_rebuild[build-outputs1]","tests/cli/test_cli.py::TestCli::test_rebuild[test-outputs2]","tests/cli/test_cli.py::TestCli::test_rebuild[switch-outputs3]","tests/cli/test_cli.py::TestCli::test_newhost","tests/cli/test_cli.py::TestCli::test_init_newhost","tests/cli/test_cli.py::TestCli::test_update[inputs=[]]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs']]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs', 'nixos']]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs', 'agenix']]","tests/unit/test_gitrepo.py::TestGitRepo::test_add[]","tests/unit/test_secrets.py::TestSecrets::test_in_repo[]","tests/unit/test_secrets.py::TestSecrets::test_init","tests/unit/test_secrets.py::TestSecrets::test__add","14 tests collected in 0.02s"]' >> $GITHUB_OUTPUT
+
+      - name: Collect tests
+        id: collect-tests
+        run: echo 'TESTS=["tests/cli/test_cli.py::TestCli::test_rebuild[dry-build-outputs0]","tests/cli/test_cli.py::TestCli::test_rebuild[build-outputs1]","tests/cli/test_cli.py::TestCli::test_rebuild[test-outputs2]","tests/cli/test_cli.py::TestCli::test_rebuild[switch-outputs3]","tests/cli/test_cli.py::TestCli::test_newhost","tests/cli/test_cli.py::TestCli::test_init_newhost","tests/cli/test_cli.py::TestCli::test_update[inputs=[]]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs']]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs', 'nixos']]","tests/cli/test_cli.py::TestCli::test_update[inputs=['nixpkgs', 'agenix']]","tests/unit/test_gitrepo.py::TestGitRepo::test_add[]","tests/unit/test_secrets.py::TestSecrets::test_in_repo[]","tests/unit/test_secrets.py::TestSecrets::test_init","tests/unit/test_secrets.py::TestSecrets::test__add","14 tests collected in 0.02s"]' >> $GITHUB_ENV
 
   parallel_tests:
     runs-on: ubuntu-latest
@@ -35,6 +43,7 @@ jobs:
       fail-fast: false
       matrix:
         test: ${{ fromJson(needs.build.outputs.tests) }}
+        test1: ${{ fromJson(needs.build.outputs.TESTS) }}
 
     needs: build
 
