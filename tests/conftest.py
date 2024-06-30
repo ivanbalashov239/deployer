@@ -56,7 +56,7 @@ def test_vm(test_path, test_sshkey, available_port):
                      shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     rsynccmd.wait()
     if rsynccmd.returncode != 0:
-        raise Exception(f"rsync failed {rsynccmd.stderr.read()}")
+        raise Exception(f"rsync failed {rsynccmd.stderr.read()} {vm.stderr.read()} {vm.stdout.read()} {vm.returncode}")
     yield vm
     vm.kill()
 
