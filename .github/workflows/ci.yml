@@ -26,7 +26,7 @@ jobs:
 
       - name: Collect tests
         id: collect-tests
-        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split(\"\n\") | map(select(length > 0))'" >> $GITHUB_ENV
+        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_ENV
 
 
   parallel_tests:
