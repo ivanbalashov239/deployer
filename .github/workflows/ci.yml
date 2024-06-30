@@ -14,11 +14,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
       - uses: cachix/install-nix-action@v18
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
+
       - uses: rrbutani/use-nix-shell-action@v1
         with:
           extraNixOptions: --accept-flake-config
+
+      - name: collect tests
+        run: echo TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))') >> $GITHUB_ENV
+
       - name: run tests in parallel
-        run: pytest -n 20
+        run: pytest -n 20 ${{ matrix.test }}
+        strategy:
+          fail-fast: false
+          matrix:
+            test: ${{ fromJson(env.TESTS) }}
