@@ -6,11 +6,11 @@ import click
 
 
 class SecretsNix:
-    filepattern = "let\s+(.*?)\s+in.*{(.*?)}"
-    machinepattern = '([a-zA-Z]+) = "(.*?)";'
-    listmachinespattern = "([a-zA-Z]+) = \[(.*?)\];"
-    filespattern = '^"(.*?)"\.publicKeys = ([a-zA-Z]+);'
-    listfilespattern = '^"(.*?)"\.publicKeys = \[(.*?)\];'
+    filepattern = r"let\s+(.*?)\s+in.*{(.*?)}"
+    machinepattern = r'([a-zA-Z]+) = "(.*?)";'
+    listmachinespattern = r"([a-zA-Z]+) = \[(.*?)\];"
+    filespattern = r'^"(.*?)"\.publicKeys = ([a-zA-Z]+);'
+    listfilespattern = r'^"(.*?)"\.publicKeys = \[(.*?)\];'
     machines = {}
     lists = {}
     files = {}
