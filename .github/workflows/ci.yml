@@ -26,15 +26,7 @@ jobs:
 
       - name: Collect tests
         id: collect-tests
-        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_ENV
-
-      - name: Set output
-        id: set-output
-        run: echo "::set-output name=tests::${{ env.TESTS }}"
-    
-    outputs:
-      tests: ${{ steps.set-output.outputs.tests }}
-
+        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
 
   parallel_tests:
     runs-on: ubuntu-latest
