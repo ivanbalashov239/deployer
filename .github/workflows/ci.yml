@@ -48,4 +48,4 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@v2
 
       - name: Run tests
-        run: pytest ${{ matrix.test }} -vv
+        run: nix develop --command pytest ${{ matrix.test }} -vv
