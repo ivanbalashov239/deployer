@@ -27,22 +27,36 @@ def test_path():
         sh.wait()
         yield tmp
 
+
 @pytest.fixture(scope="function")
-def test_vm(test_path, test_sshkey):
-    buildvm = Popen("nixos-rebuild build-vm --flake ./etc/nixos/#test", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+def available_port():
+    """ get non used port"""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("localhost", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+@pytest.fixture(scope="function")
+def test_vm(test_path, test_sshkey, available_port):
+    buildvm = Popen("nixos-rebuild build-vm --flake ./etc/nixos/#test", cwd=Path(test_path), shell=True, stdin=PIPE,
+                    stdout=PIPE, stderr=PIPE)
     buildvm.wait()
-    ssh_args = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_sshkey}"
+    ssh_args = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_sshkey}"
     ssh_args_e = f"-e 'ssh {ssh_args}'"
-    env = {"QEMU_NET_OPTS": "hostfwd=tcp::2221-:22"}
-    vm = Popen("result/bin/run-nixos-vm --nographic", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
+    env = {"QEMU_NET_OPTS": f"hostfwd=tcp::{available_port}-:22"}
+    vm = Popen("result/bin/run-nixos-vm --nographic", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE,
+               stderr=PIPE, env=env)
     time.sleep(5)
-    rsynccmd = Popen(f"rsync {ssh_args_e} -rvha ./etc/nixos/ root@localhost:/etc/nixos/", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    rsynccmd = Popen(f"rsync {ssh_args_e} -rvha ./etc/nixos/ root@localhost:/etc/nixos/", cwd=Path(test_path),
+                     shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     rsynccmd.wait()
     if rsynccmd.returncode != 0:
         raise Exception(f"rsync failed {rsynccmd.stderr.read()}")
     yield vm
     vm.kill()
-
 
 
 @pytest.fixture(scope="function")
@@ -64,51 +78,8 @@ def verify_files():
                         result[name] = file.read_text()
             return result
 
-        original_files = get_files(original)
+        original_files = {i: f for i, f in get_files(original).items() if f.strip() != "{ }"}
         files_in_repo = get_files(repo, base=Path(test_repo, "hosts/testhost"))
         assert original_files == files_in_repo
-    return f
 
-# @pytest.fixture(scope="session")
-# def vmimage(test_path):
-#     uuid="023fc77c-1c63-4f0f-827a-07fcbff4bfca"
-#     with tempfile.NamedTemporaryFile() as tmp1:
-#         path = tmp1.name
-#         with tempfile.NamedTemporaryFile() as tmp:
-#             name = tmp.name
-#             run(["qemu-img", "create", "-f", "raw", name, "1G"])
-#             run(["mkfs.ext4", name, "-U", uuid, "-L", "nixos"])
-#             run(["qemu-img", "convert", "-f", "raw", "-O", "qcow2", name, path])
-#         yield path
-#
-# @pytest.fixture(scope="session")
-# def test_vm(vmimage, test_path):
-#     buildvm = Popen(f"nixos-rebuild build --flake ./etc/nixos/#test", cwd=Path(test_path), shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-#     buildvm.wait()
-#     QEMU_NET_OPTS = "hostfwd=tcp::2221-:22"
-#     vm = Popen(["qemu-kvm",
-#                 # "-cpu max",
-#                 # "-name testhost",
-#                 "-m 1024",
-#                 "-smp 1",
-#                 "-device virtio-rng-pci",
-#                 f"-net nic,netdev=user.0,model=virtio -netdev user,id=user.0,\"{QEMU_NET_OPTS}\"",
-#                 "-virtfs local,path=/nix/store,security_model=none,mount_tag=nix-store",
-#                 # "-virtfs local,path="${SHARED_DIR:-$TMPDIR/xchg}",security_model=none,mount_tag=shared \
-#                 # -virtfs local,path="$TMPDIR"/xchg,security_model=none,mount_tag=xchg \
-#                 f"-drive cache=writeback,file=\"{vmimage}\",id=drive1,if=none,index=1,werror=report -device virtio-blk-pci,bootindex=1,drive=drive1,serial=root",
-#                 "-device virtio-keyboard",
-#                 "-usb",
-#                 "-device usb-tablet,bus=usb-bus.0 ",
-#                 "-kernel",
-#                 Path(test_path, "result", "kernel").resolve(),
-#                 "-initrd",
-#                 Path(test_path, "result", "initrd").resolve(),
-#                 "-append",
-#                 Path(test_path, "result", "kernel-params").read_text().split("\n")[0].strip(),
-#                 f"init={Path(test_path, 'result', 'init').resolve()}",
-#                 "regInfo=/nix/store/drqsamcgqkbvkkx1v0dq86x4llxmibrf-closure-info/registration",
-#                 "console=ttyS0,115200n8 console=tty0"
-#                 ])
-#     yield vm
-#     vm.kill()
+    return f

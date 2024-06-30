@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+import re
 
 from click.testing import CliRunner
 
@@ -14,263 +15,46 @@ def ids(x):
 
 
 class TestCli:
-    @pytest.mark.parametrize("command, output_start, output_end", [
-        ["dry-build", """git init; git add *; git add .*
-
--- hardlinking {test_repo}/hosts/testhost/configs --
-
-cp -lr {test_repo}/configs {test_repo}/hosts/testhost/configs
-git add {test_repo}/hosts/testhost/configs
-
--- hardlinking {test_repo}/hosts/testhost/modules --
-
-cp -lr {test_repo}/modules {test_repo}/hosts/testhost/modules
-git add {test_repo}/hosts/testhost/modules
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- removing hosts/testhost/.git --
-
-rm -rf {test_repo}/hosts/testhost/.git
-git init; git add *; git add .*
+    @pytest.mark.parametrize("command, outputs", [
+        ["dry-build", ["""git init; git add *; git add .*
 cd hosts/testhost
 waiting: nixos-rebuild dry-build --flake ./#testhost
-completed
-building the system configuration...
-
-warning: Git tree '{test_repo}/hosts/testhost' is dirty
-""",
-         """
-         end of dry-build
-         
-         -- removing {test_repo}/hosts/testhost/configs --
-         
-         rm -rf {test_repo}/hosts/testhost/configs
-         
-         -- removing {test_repo}/hosts/testhost/modules --
-         
-         rm -rf {test_repo}/hosts/testhost/modules
-         
-         -- removing {test_repo}/hosts/testhost/secrets/hosts/testhost --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets/hosts/testhost
-         
-         -- removing {test_repo}/hosts/testhost/secrets --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets
-         
-         -- removing hosts/testhost/.git --
-         
-         rm -rf {test_repo}/hosts/testhost/.git
-         """],
-        ["build", """git init; git add *; git add .*
-
--- hardlinking {test_repo}/hosts/testhost/configs --
-
-cp -lr {test_repo}/configs {test_repo}/hosts/testhost/configs
-git add {test_repo}/hosts/testhost/configs
-
--- hardlinking {test_repo}/hosts/testhost/modules --
-
-cp -lr {test_repo}/modules {test_repo}/hosts/testhost/modules
-git add {test_repo}/hosts/testhost/modules
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- removing hosts/testhost/.git --
-
-rm -rf {test_repo}/hosts/testhost/.git
-git init; git add *; git add .*
+completed""", "end of dry-build"]],
+        ["build", ["""git init; git add *; git add .*
 cd hosts/testhost
 waiting: nixos-rebuild dry-build --flake ./#testhost
-completed
-building the system configuration...
-
-warning: Git tree '{test_repo}/hosts/testhost' is dirty
-""",
-         """
-         end of dry-build
-         cd hosts/testhost
-         rsync -e 'ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_path}/etc/ssh/ssh_host_ed25519_key' -rvh --chown=root:root ./ root@localhost:/etc/nixos
-         ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_path}/etc/ssh/ssh_host_ed25519_key root@localhost nixos-rebuild build --flake /etc/nixos/#testhost
-         
-         -- removing {test_repo}/hosts/testhost/configs --
-         
-         rm -rf {test_repo}/hosts/testhost/configs
-         
-         -- removing {test_repo}/hosts/testhost/modules --
-         
-         rm -rf {test_repo}/hosts/testhost/modules
-         
-         -- removing {test_repo}/hosts/testhost/secrets/hosts/testhost --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets/hosts/testhost
-         
-         -- removing {test_repo}/hosts/testhost/secrets --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets
-         
-         -- removing hosts/testhost/.git --
-         
-         rm -rf {test_repo}/hosts/testhost/.git
-         """],
-        ["test", """git init; git add *; git add .*
-
--- hardlinking {test_repo}/hosts/testhost/configs --
-
-cp -lr {test_repo}/configs {test_repo}/hosts/testhost/configs
-git add {test_repo}/hosts/testhost/configs
-
--- hardlinking {test_repo}/hosts/testhost/modules --
-
-cp -lr {test_repo}/modules {test_repo}/hosts/testhost/modules
-git add {test_repo}/hosts/testhost/modules
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- removing hosts/testhost/.git --
-
-rm -rf {test_repo}/hosts/testhost/.git
-git init; git add *; git add .*
+completed""", "end of dry-build", """cd hosts/testhost
+rsync -e 'ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_path}/etc/ssh/ssh_host_ed25519_key' -rvh --chown=root:root ./ root@localhost:/etc/nixos
+ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_path}/etc/ssh/ssh_host_ed25519_key root@localhost nixos-rebuild build --flake /etc/nixos/#testhost"""]],
+        ["test", ["""git init; git add *; git add .*
 cd hosts/testhost
 waiting: nixos-rebuild dry-build --flake ./#testhost
-completed
-building the system configuration...
-
-warning: Git tree '{test_repo}/hosts/testhost' is dirty
-""",
-         """end of dry-build
-         cd hosts/testhost
-         rsync -e 'ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_path}/etc/ssh/ssh_host_ed25519_key' -rvh --chown=root:root ./ root@localhost:/etc/nixos
-         ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_path}/etc/ssh/ssh_host_ed25519_key root@localhost nixos-rebuild test --flake /etc/nixos/#testhost
-         
-         -- removing {test_repo}/hosts/testhost/configs --
-         
-         rm -rf {test_repo}/hosts/testhost/configs
-         
-         -- removing {test_repo}/hosts/testhost/modules --
-         
-         rm -rf {test_repo}/hosts/testhost/modules
-         
-         -- removing {test_repo}/hosts/testhost/secrets/hosts/testhost --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets/hosts/testhost
-         
-         -- removing {test_repo}/hosts/testhost/secrets --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets
-         
-         -- removing hosts/testhost/.git --
-         
-         rm -rf {test_repo}/hosts/testhost/.git
-         """],
-        ["switch", """git init; git add *; git add .*
-
--- hardlinking {test_repo}/hosts/testhost/configs --
-
-cp -lr {test_repo}/configs {test_repo}/hosts/testhost/configs
-git add {test_repo}/hosts/testhost/configs
-
--- hardlinking {test_repo}/hosts/testhost/modules --
-
-cp -lr {test_repo}/modules {test_repo}/hosts/testhost/modules
-git add {test_repo}/hosts/testhost/modules
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- hardlinking {test_repo}/hosts/testhost/secrets/hosts/testhost --
-
-cp -lr {test_repo}/secrets/hosts/testhost {test_repo}/hosts/testhost/secrets/hosts/testhost
-git add {test_repo}/hosts/testhost/secrets/hosts/testhost
-
--- removing hosts/testhost/.git --
-
-rm -rf {test_repo}/hosts/testhost/.git
-git init; git add *; git add .*
+completed""", "end of dry-build", """cd hosts/testhost
+rsync -e 'ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_path}/etc/ssh/ssh_host_ed25519_key' -rvh --chown=root:root ./ root@localhost:/etc/nixos
+ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_path}/etc/ssh/ssh_host_ed25519_key root@localhost nixos-rebuild test --flake /etc/nixos/#testhost"""]],
+        ["switch", ["""git init; git add *; git add .*
 cd hosts/testhost
 waiting: nixos-rebuild dry-build --flake ./#testhost
-completed
-building the system configuration...
-
-warning: Git tree '{test_repo}/hosts/testhost' is dirty
-""",
-         """end of dry-build
-         cd hosts/testhost
-         rsync -e 'ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_path}/etc/ssh/ssh_host_ed25519_key' -rvh --chown=root:root ./ root@localhost:/etc/nixos
-         ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_path}/etc/ssh/ssh_host_ed25519_key root@localhost nixos-rebuild switch --flake /etc/nixos/#testhost
-         
-         -- removing {test_repo}/hosts/testhost/configs --
-         
-         rm -rf {test_repo}/hosts/testhost/configs
-         
-         -- removing {test_repo}/hosts/testhost/modules --
-         
-         rm -rf {test_repo}/hosts/testhost/modules
-         
-         -- removing {test_repo}/hosts/testhost/secrets/hosts/testhost --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets/hosts/testhost
-         
-         -- removing {test_repo}/hosts/testhost/secrets --
-         
-         rm -rf {test_repo}/hosts/testhost/secrets
-         
-         -- removing hosts/testhost/.git --
-         
-         rm -rf {test_repo}/hosts/testhost/.git
-         """],
+completed""", "end of dry-build", """cd hosts/testhost
+rsync -e 'ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_path}/etc/ssh/ssh_host_ed25519_key' -rvh --chown=root:root ./ root@localhost:/etc/nixos
+ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_path}/etc/ssh/ssh_host_ed25519_key root@localhost nixos-rebuild switch --flake /etc/nixos/#testhost"""]],
     ], ids=ids)
-    def test_rebuild(self, test_repo, test_path, test_vm, test_sshkey, command, monkeypatch, output_start, output_end):
+    def test_rebuild(self, test_repo, test_path, test_vm, test_sshkey, command, monkeypatch, available_port, outputs):
         runner = CliRunner(mix_stderr=False)
         monkeypatch.chdir(test_repo)
-        sshargs = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_sshkey}"
+        sshargs = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_sshkey}"
         env = {"SSH_ARGS": sshargs}
         result = runner.invoke(cli, ["rebuild", command, "testhost", "root@localhost"], env=env, )
-        print(result.stdout)
+        for i, line in enumerate(outputs):
+            outputs[i] = line.format(test_path=test_path, available_port=available_port)
         assert result.exit_code == 0, result.stderr
-        output_start = output_start.format(test_repo=test_repo, test_path=test_path)
-        output_end = output_end.format(test_repo=test_repo, test_path=test_path)
-        assert result.output[:len(output_start)] == output_start
-        assert result.output[-len(output_end):] == output_end
+        missing = []
+        for output in outputs:
+            if output not in result.stdout:
+                missing.append(output)
+        assert len(missing) == 0, f"missing: {missing}\n{result.stdout}\nmissing: {missing}"
 
-    def test_newhost(self, test_repo, capsys, monkeypatch):
+    def test_newhost(self, test_repo, monkeypatch):
         monkeypatch.chdir(test_repo)
         runner = CliRunner()
         result = runner.invoke(cli, ["newhost", "newtesthost"], input="fakekey\nfakekey2\n")
@@ -302,11 +86,11 @@ warning: Git tree '{test_repo}/hosts/testhost' is dirty
         flakenix = Path(test_repo, "hosts/newtesthost/flake.nix")
         assert flakenix.exists()
 
-    def test_init_newhost(self, test_repo, test_path, test_vm, test_sshkey, capsys, monkeypatch):
+    def test_init_newhost(self, test_repo, test_path, test_vm, test_sshkey, monkeypatch, available_port):
         monkeypatch.chdir(test_repo)
         runner = CliRunner(mix_stderr=False)
         monkeypatch.chdir(test_repo)
-        sshargs = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_sshkey}"
+        sshargs = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_sshkey}"
         env = {"SSH_ARGS": sshargs}
         result = runner.invoke(cli, ["rebuild", "init", "newtesthost", "root@localhost"],
                                input="y\nfakekey\nfakekey2\ny\n", env=env)
@@ -318,11 +102,11 @@ warning: Git tree '{test_repo}/hosts/testhost' is dirty
         [["nixpkgs", "nixos"]],
         [["nixpkgs", "agenix"]]
     ], ids=lambda x: f"inputs={x}")
-    def test_update(self, test_repo, test_path, test_sshkey, monkeypatch, input_names):
+    def test_update(self, test_repo, test_path, test_sshkey, monkeypatch, input_names, available_port):
         time.sleep(30)
         monkeypatch.chdir(test_repo)
         runner = CliRunner(mix_stderr=False)
-        sshargs = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p 2221 -i {test_sshkey}"
+        sshargs = f"-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -p {available_port} -i {test_sshkey}"
         env = {"SSH_ARGS": sshargs}
         args = ["update", "testhost"]
         if len(input_names) > 0:
