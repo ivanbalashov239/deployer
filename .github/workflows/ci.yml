@@ -28,6 +28,13 @@ jobs:
         id: collect-tests
         run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_ENV
 
+      - name: Set output
+        id: set-output
+        run: echo "::set-output name=tests::${{ env.TESTS }}"
+    
+    outputs:
+      tests: ${{ steps.set-output.outputs.tests }}
+
 
   parallel_tests:
     runs-on: ubuntu-latest
@@ -35,13 +42,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: ${{ fromJson( env.TESTS ) }}
+        test: ${{ fromJson(needs.build.outputs.tests) }}
 
     needs: build
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Run tests
         run: pytest ${{ matrix.test }} -vv
