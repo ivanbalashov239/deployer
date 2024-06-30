@@ -17,12 +17,8 @@ jobs:
       - uses: cachix/install-nix-action@v18
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - name: Print env, before
-        run: env
-      - name: ls files in repo
-        run: ls -laR
       - uses: rrbutani/use-nix-shell-action@v1
         with:
-          devShell: .#default --accept-flake-config
+          devShell: .#devShell --accept-flake-config
       - name: run tests in parallel
         run: pytest -n 20
