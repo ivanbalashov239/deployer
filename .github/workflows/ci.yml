@@ -1,6 +1,5 @@
 name: CI
 
-
 on:
   push:
     branches: [ main ]
@@ -9,24 +8,43 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - uses: cachix/install-nix-action@v18
+      - name: Install Nix
+        uses: cachix/install-nix-action@v18
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
 
-      - uses: rrbutani/use-nix-shell-action@v1
+      - name: Use Nix Shell
+        uses: rrbutani/use-nix-shell-action@v1
         with:
           extraNixOptions: --accept-flake-config
 
-      - name: collect tests
-        run: echo TESTS=$(pytest --collect-only -q | jq -R -s -c 'split("\n") | map(select(length > 0))') >> $GITHUB_ENV
+      - name: Collect tests
+        id: collect-tests
+        run: echo "TESTS=$(pytest --collect-only -q | jq -R -s -c 'split(\"\n\") | map(select(length > 0))')" >> $GITHUB_ENV
 
-      - name: run tests in parallel
+      - name: Set matrix dynamically
+        run: echo "::set-output name=test-matrix::$(jq -c 'split("\n") | map(select(length > 0))' <<< "${{ env.TESTS }}")"
+        id: set-matrix
+
+  parallel_tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test: ${{ fromJson(needs.build.outputs['set-matrix']) }}
+
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run tests
         run: pytest -n 20 ${{ matrix.test }}
-        strategy:
-          fail-fast: false
-          matrix:
-            test: ${{ fromJson(env.TESTS) }}
