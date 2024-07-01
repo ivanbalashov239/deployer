@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
@@ -29,7 +29,7 @@ jobs:
     outputs:
       tests: ${{ steps.collect-tests.outputs.tests }}
 
-  parallel_tests:
+  test:
     runs-on: ubuntu-latest
 
     strategy:
@@ -50,4 +50,4 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@v2
 
       - name: Run tests
-        run: nix develop --accept-flake-config --command pytest ${{ matrix.test }} -vv
+        run: nix develop --accept-flake-config --command pytest -n 5 ${{ matrix.test }} -vv
