@@ -22,7 +22,9 @@ jobs:
 
       - name: Collect tests
         id: collect-tests
-        run: echo "tests=$(nix develop --accept-flake-config --command pytest --collect-only -q | awk -F'::' '/::/{split($3, a, \"\\[\"); print \"\\"\"$1\"::\"$2\"::\"a[1]\"\\"\"}' | sort | uniq | paste -sd \",\" - | sed 's/^/[/;s/$/]/')" >> $GITHUB_OUTPUT
+        run: |
+          tests=$(nix develop --accept-flake-config --command pytest --collect-only -q | awk -F'::' '/::/{split($3, a, "\\["); print "\""$1"::"$2"::"a[1]"\""}' | sort | uniq | paste -sd "," - | sed 's/^/[/;s/$/]/')
+          echo "tests=$tests" >> $GITHUB_OUTPUT
 
     outputs:
       tests: ${{ steps.collect-tests.outputs.tests }}
