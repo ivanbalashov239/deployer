@@ -332,7 +332,7 @@ def update(ctx, host, inputname, args):
 @click.option("--force", "-f", is_flag=True)
 @click.pass_context
 def secrets(ctx, path, force):
-    secrets = SecretsNix(path)
+    secrets = SecretsNix(Path(path))
     secrets.save(force)
 
 

@@ -25,7 +25,7 @@
           overlays = [ agenix.overlays.default ];
         };
         poetry2nix = import poetry2nixrepo { inherit pkgs; };
-        dependencies = with pkgs; [ tmux git jq ragenix ];
+        dependencies = with pkgs; [ tmux git jq ragenix pkgs.qemu_kvm pkgs.nixos-rebuild openssh];
         deployer = poetry2nix.mkPoetryApplication {
           projectDir = ./.;
           python = pkgs.python311;
@@ -46,7 +46,7 @@
       in
       rec {
         devShell = pkgs.mkShell {
-          buildInputs = dependencies ++ [ pkgs.qemu_kvm deployerEnv pkgs.poetry pkgs.nixos-rebuild ];
+          buildInputs = dependencies ++ [  deployerEnv pkgs.poetry ];
           #          shellHook = ''${pkgs.zsh}/bin/zsh'';
         };
         apps.deployer = deployer;

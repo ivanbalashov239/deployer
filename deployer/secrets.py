@@ -68,14 +68,15 @@ class SecretsNix:
         return "let\n" + f"{machines}\n{lists}\nin" + "\n{\n" f"{files}" + "\n}"
 
     def save(self, force=False):
-        with open(self.path, "w") as f:
-            f.write(str(self))
         rootpath = self.path.parent.parent
         secretsoriginroot = Path(rootpath, ".secrets")
         secretsroot = Path(rootpath, "secrets")
         for name, hosts in self.files.items():
-            if not all(host in self.machines for host in hosts):
-                raise Exception(f"{name} one of hosts keys is missing {hosts}")
+            for host in hosts:
+                if host not in self.machines.keys():
+                    self.machines[host] = self._get_key(host)
+            with open(self.path, "w") as f:
+                f.write(str(self))
             secretorigin = Path(secretsoriginroot, name)
             secretpath = Path(secretsroot, name)
             if not secretpath.exists() or force:
@@ -109,3 +110,18 @@ class SecretsNix:
 
     def __exit__(self, *args):
         self.save()
+
+    def _get_key(self, host):
+        """
+        read key from self.path.parent.parent/.secrets/hosts/host/ssh_host_ed25519_key.pub
+        :param host:
+        :return:
+        """
+        rootpath = self.path.parent.parent
+        secretsoriginroot = Path(rootpath, ".secrets")
+        hostpath = Path(secretsoriginroot, "hosts", host)
+        keypath = Path(hostpath, "ssh_host_ed25519_key.pub")
+        if not keypath.exists():
+            raise FileNotFoundError(f"key for {host} not found")
+        with open(keypath) as file:
+            return file.read().strip()
